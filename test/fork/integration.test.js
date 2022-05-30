@@ -14,6 +14,10 @@ const UniswapV3TradeIntegration = '0xc300FB5dE5384bcA63fb6eb3EfD9DB7dFd10325C';
 const NFT_URI = 'https://babylon.mypinata.cloud/ipfs/QmcL826qNckBzEk2P11w4GQrrQFwGvR6XmUCuQgBX9ck1v';
 const NFT_SEED = '504592746';
 
+// https://etherscan.io/address/0xb0b958398abb0b5db4ce4d7598fb868f5a00f372#readProxyContract
+const BANCOR_V3_REWARDS_ADDRESS = '0xb0B958398ABB0b5DB4ce4d7598Fb868f5A00f372';
+const BANCOR_V3_REWARDS_PROGRAMS = [5, 6, 7, 8];
+
 describe('Babylon integrations', function () {
   let owner;
   let garden;
@@ -194,4 +198,52 @@ describe('Babylon integrations', function () {
     await increaseTime(ONE_DAY_IN_SECONDS * 30);
     await customStrategy.connect(keeper).finalizeStrategy(0, '', 0);
   });
+
+  for (const i of BANCOR_V3_REWARDS_PROGRAMS) {
+    it(`can deploy a strategy with a Bancor V3 Rewards custom integration (program=${i})`, async () => {
+      const customIntegration = await deploy('CustomIntegrationBancorV3Rewards', {
+        from: alice.address,
+        args: [controller.address, BANCOR_V3_REWARDS_ADDRESS],
+      });
+
+      await garden.connect(alice).addStrategy(
+        'Bancor V3 Rewards',
+        '💎',
+        [
+          eth(10), // maxCapitalRequested: eth(10),
+          eth(0.1), // stake: eth(0.1),
+          ONE_DAY_IN_SECONDS * 30, // strategyDuration: ONE_DAY_IN_SECONDS * 30,
+          eth(0.05), // expectedReturn: eth(0.05),
+          eth(0.1), // maxAllocationPercentage: eth(0.1),
+          eth(0.05), // maxGasFeePercentage: eth(0.05),
+          eth(0.09), // maxTradeSlippagePercentage: eth(0.09),
+        ],
+        [5], // _opTypes
+        [customIntegration.address], // _opIntegrations
+        new ethers.utils.AbiCoder().encode(
+          ['uint256', 'uint256'],
+          [i, 0] // integration params. We pass the program number
+        ), // _opEncodedDatas
+      );
+
+      const strategies = await garden.getStrategies();
+      customStrategy = await ethers.getContractAt('IStrategy', strategies[0]);
+
+      await garden.connect(alice).deposit(eth(1), 0, alice.address, ADDRESS_ZERO, {
+        value: eth(1),
+      });
+      const balance = await garden.balanceOf(alice.getAddress());
+
+      // Vote Strategy
+      await customStrategy.connect(keeper).resolveVoting([alice.address], [balance], 0);
+
+      // Execute strategy
+      await increaseTime(ONE_DAY_IN_SECONDS);
+      await customStrategy.connect(keeper).executeStrategy(eth(1), 0);
+
+      // Finalize strategy
+      await increaseTime(ONE_DAY_IN_SECONDS * 30);
+      await customStrategy.connect(keeper).finalizeStrategy(0, '', 0);
+    });
+  }
 });
