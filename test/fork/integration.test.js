@@ -211,4 +211,54 @@ describe('Babylon integrations', function () {
     await increaseTime(ONE_DAY_IN_SECONDS * 30);
     await customStrategy.connect(keeper).finalizeStrategy(0, '', 0);
   });
+
+  for (const [symbol, safeBoxAddress] of Object.entries(ALPHA_HOMORA_V2.lend)) {
+    it(`can deploy a strategy with the Alpha Homora V2 Lend integration - ${symbol}`, async () => {
+
+      // We deploy the custom yearn integration. Change with your own integration when ready
+      const customIntegration = await deploy('CustomIntegrationAlphaHomoraV2Lend', {
+        from: alice.address,
+        args: [controller.address],
+      });
+
+      await garden.connect(alice).addStrategy(
+        `Alpha Homora V2 Lend - ${symbol}`,
+        '💎',
+        [
+          eth(10), // maxCapitalRequested: eth(10),
+          eth(0.1), // stake: eth(0.1),
+          ONE_DAY_IN_SECONDS * 30, // strategyDuration: ONE_DAY_IN_SECONDS * 30,
+          eth(0.05), // expectedReturn: eth(0.05),
+          eth(0.1), // maxAllocationPercentage: eth(0.1),
+          eth(0.05), // maxGasFeePercentage: eth(0.05),
+          eth(0.09), // maxTradeSlippagePercentage: eth(0.09),
+        ],
+        [5], // _opTypes
+        [customIntegration.address], // _opIntegrations
+        new ethers.utils.AbiCoder().encode(
+          ['address', 'uint256'],
+          [safeBoxAddress, 0] // integration params. We pass safeBoxAddress
+        ), // _opEncodedDatas
+      );
+
+      const strategies = await garden.getStrategies();
+      customStrategy = await ethers.getContractAt('IStrategy', strategies[0]);
+
+      await garden.connect(alice).deposit(eth(1), 0, alice.address, ADDRESS_ZERO, {
+        value: eth(1),
+      });
+      const balance = await garden.balanceOf(alice.getAddress());
+
+      // Vote Strategy
+      await customStrategy.connect(keeper).resolveVoting([alice.address], [balance], 0);
+
+      // Execute strategy
+      await increaseTime(ONE_DAY_IN_SECONDS);
+      await customStrategy.connect(keeper).executeStrategy(eth(1), 0);
+
+      // Finalize strategy
+      await increaseTime(ONE_DAY_IN_SECONDS * 30);
+      await customStrategy.connect(keeper).finalizeStrategy(0, '', 0);
+    });
+  }
 });
