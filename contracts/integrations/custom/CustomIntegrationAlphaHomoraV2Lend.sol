@@ -10,10 +10,10 @@ import {PreciseUnitMath} from '../../lib/PreciseUnitMath.sol';
 import {LowGasSafeMath} from '../../lib/LowGasSafeMath.sol';
 import {BytesLib} from '../../lib/BytesLib.sol';
 import {ControllerLib} from '../../lib/ControllerLib.sol';
-import {IWETH} from '../../interfaces/external/weth/IWETH.sol';
 import {ISafeBox} from '../../interfaces/external/alpha-homora-v2/ISafeBox.sol';
 import {ISafeBoxETH} from '../../interfaces/external/alpha-homora-v2/ISafeBoxETH.sol';
 import {ICToken} from '../../interfaces/external/compound/ICToken.sol';
+import "hardhat/console.sol";
 
 /**
  * @title CustomIntegrationAlphaHomoraV2Lend
@@ -170,13 +170,9 @@ contract CustomIntegrationAlphaHomoraV2Lend is CustomIntegration {
         address[] memory inputTokens = new address[](1);
         uint256[] memory inputWeights = new uint256[](1);
         inputWeights[0] = 1e18; // 100%
-
-        if (_isETHSafeBox(safeBoxAddress)) {
-          inputTokens[0] = ISafeBoxETH(payable(safeBoxAddress)).weth();
-        } else {
-          inputTokens[0] = ISafeBox(safeBoxAddress).uToken();
-        }
-
+        inputTokens[0] = _isETHSafeBox(safeBoxAddress) ?
+          address(0) :
+          ISafeBox(safeBoxAddress).uToken();
         return (inputTokens, inputWeights);
     }
 
@@ -225,82 +221,6 @@ contract CustomIntegrationAlphaHomoraV2Lend is CustomIntegration {
         address cToken = ISafeBox(safeBoxAddress).cToken();
         uint exchangeRate = ICToken(cToken).exchangeRateStored();
         return _getPrice(underlyingToken, _tokenDenominator).preciseMul(exchangeRate);
-    }
-
-    /**
-     * (OPTIONAL). Return pre action calldata
-     *
-     * hparam _strategy                  Address of the strategy
-     * hparam  _asset                    Address param
-     * hparam  _amount                   Amount
-     * hparam  _customOp                 Type of Custom op
-     *
-     * @return address                   Target contract address
-     * @return uint256                   Call value
-     * @return bytes                     Trade calldata
-     */
-    function _getPreActionCallData(
-        address, /* _strategy */
-        address _asset,
-        uint256 _amount,
-        uint256 _customOp
-    )
-        internal
-        view
-        override
-        returns (
-            address,
-            uint256,
-            bytes memory
-        )
-    {
-      if (_isETHSafeBox(_asset)) {
-        if (_customOp == 0) {// enter, need to unwrap WETH -> ETH
-          return (ISafeBoxETH(payable(_asset)).weth(), 0, abi.encodeWithSelector(IWETH.withdraw.selector, _amount));
-        } else {
-          return (address(0), 0, bytes(''));
-        }
-      } else {
-        return (address(0), 0, bytes(''));
-      }
-    }
-
-    /**
-     * (OPTIONAL) Return post action calldata
-     *
-     * hparam  _strategy                 Address of the strategy
-     * hparam  _asset                    Address param
-     * hparam  _amount                   Amount
-     * hparam  _customOp                 Type of op
-     *
-     * @return address                   Target contract address
-     * @return uint256                   Call value
-     * @return bytes                     Trade calldata
-     */
-    function _getPostActionCallData(
-        address, /* _strategy */
-        address _asset,
-        uint256 _amount,
-        uint256 _customOp
-    )
-        internal
-        view
-        override
-        returns (
-            address,
-            uint256,
-            bytes memory
-        )
-    {
-      if (_isETHSafeBox(_asset)) {
-        if (_customOp == 1) {// exit, need to wrap ETH -> WETH
-          return (ISafeBoxETH(payable(_asset)).weth(), 0, abi.encodeWithSelector(IWETH.deposit.selector, _amount));
-        } else {
-          return (address(0), 0, bytes(''));
-        }
-      } else {
-        return (address(0), 0, bytes(''));
-      }
     }
 
     function _isValidSafeBox(address _safeBoxAddress) internal view returns (bool) {
