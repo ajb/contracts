@@ -15,6 +15,11 @@ const NFT_URI = 'https://babylon.mypinata.cloud/ipfs/QmcL826qNckBzEk2P11w4GQrrQF
 const NFT_SEED = '504592746';
 
 const ALPHA_HOMORA_V2 = {
+  homoraBank: '0xba5eBAf3fc1Fcca67147050Bf80462393814E54B',
+  spells: {
+    'UNI/ETH': '0x00b1a4e7f217380a7c9e6c12f327ac4a1d9b6a14',
+    '3pool': '0x8b947d8448cffb89ef07a6922b74fbabac219795'
+  },
   lend: {
     ETH: '0xeEa3311250FE4c3268F8E684f7C87A82fF183Ec1',
     DAI: '0xee8389d235E092b2945fE363e97CDBeD121A0439',
